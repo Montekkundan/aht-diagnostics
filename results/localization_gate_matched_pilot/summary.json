@@ -1,0 +1,75 @@
+{
+  "config": {
+    "diagnosis_quota_per_split_and_type": 5,
+    "discovery_policies": [
+      "independent_agent_0",
+      "plate_agent_0.1"
+    ],
+    "ego_mode": "heuristic",
+    "eligibility": "healthy >= 20, matched witness >= 20, planted loss >= 20, defect triggered",
+    "healthy_quota_per_split_and_policy": 5,
+    "heldout_policies": [
+      "onion_agent_0.1",
+      "independent_agent_0.4"
+    ],
+    "max_steps": 100,
+    "mode": "pilot",
+    "reference_mode": "matched",
+    "repair_budget": 4,
+    "repair_threshold": 20.0
+  },
+  "gates": {
+    "better_than_localization_baselines": {
+      "pass": true,
+      "threshold": "margin >= 0.15 and 95% lower bound > 0",
+      "value": {
+        "action_kl_hit": 0.26666666666666666,
+        "best_baseline": "action_kl_hit",
+        "bootstrap_95_lower": 0.06666666666666667,
+        "event_rule_hit": 0.02034332913178236,
+        "margin": 0.26666666666666666,
+        "random_hit": 0.01,
+        "repair_hit": 0.5333333333333333
+      }
+    },
+    "eligible_cases": {
+      "pass": true,
+      "threshold": 5,
+      "value": {
+        "delivery_avoidance": 5,
+        "onion_placement_avoidance": 5,
+        "soup_pickup_avoidance": 5
+      }
+    },
+    "healthy_false_positive_rate": {
+      "pass": true,
+      "threshold": 0.1,
+      "value": 0.0
+    },
+    "heldout_localization_auc": {
+      "pass": false,
+      "threshold": 0.8,
+      "value": 0.7592592592592592
+    },
+    "outcome_improving_repair_rate": {
+      "pass": false,
+      "threshold": 0.7,
+      "value": 0.6666666666666666
+    },
+    "semantic_decision_hit_rate": {
+      "pass": false,
+      "threshold": 0.7,
+      "value": 0.5333333333333333
+    },
+    "weakness_type_macro_f1": {
+      "pass": true,
+      "threshold": 0.75,
+      "value": 0.7830687830687829
+    }
+  },
+  "heldout_eligible_total": 15,
+  "heldout_healthy_total": 10,
+  "reason": "At least one preregistered evaluator gate failed with sufficient cases.",
+  "verdict": "UNSUCCESSFUL",
+  "warning": "A controlled pass is calibration evidence, not a paper-ready result."
+}

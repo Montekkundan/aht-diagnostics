@@ -1,0 +1,15 @@
+{
+  "repository": "jaxaht/eval-teammates-br",
+  "repository_type": "dataset",
+  "revision": "6e4debde5359fff91c767e0625f78ddebca71014",
+  "task": "overcooked-v1/cramped_room",
+  "status": "downloaded locally under ignored data/checkpoints; not bundled",
+  "frozen_ego_training_partner": "independent_agent_0",
+  "frozen_ego": "cramped_room_independent_agent_0_serious/2026-03-16_12-18-02/ego_train_run",
+  "reference_checkpoints": {
+    "independent_agent_0": "cramped_room_independent_agent_0_serious/2026-03-16_12-18-02/ego_train_run",
+    "independent_agent_0.4": "cramped_room_independent_agent_0_4_serious/2026-03-16_11-55-04/ego_train_run",
+    "onion_agent_0.1": "cramped_room_onion_agent_0_1_serious/2026-03-16_12-20-27/ego_train_run",
+    "plate_agent_0.1": "cramped_room_plate_agent_0_1_serious/2026-03-16_12-43-21/ego_train_run"
+  }
+}
