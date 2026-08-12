@@ -4,8 +4,12 @@
   "revision": "6e4debde5359fff91c767e0625f78ddebca71014",
   "task": "overcooked-v1/cramped_room",
   "status": "downloaded locally under ignored data/checkpoints; not bundled",
-  "frozen_ego_training_partner": "independent_agent_0",
-  "frozen_ego": "cramped_room_independent_agent_0_serious/2026-03-16_12-18-02/ego_train_run",
+  "reported_ego_mode": "heuristic",
+  "learned_ego_candidate": {
+    "training_partner": "independent_agent_0",
+    "checkpoint": "cramped_room_independent_agent_0_serious/2026-03-16_12-18-02/ego_train_run",
+    "used_as_reported_ego": false
+  },
   "reference_checkpoints": {
     "independent_agent_0": "cramped_room_independent_agent_0_serious/2026-03-16_12-18-02/ego_train_run",
     "independent_agent_0.4": "cramped_room_independent_agent_0_4_serious/2026-03-16_11-55-04/ego_train_run",

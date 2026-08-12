@@ -109,6 +109,12 @@ def parse_args() -> argparse.Namespace:
         default="learned",
         help="heuristic is a controlled calibration; learned uses the downloaded S5 BR",
     )
+    parser.add_argument(
+        "--candidate-mode",
+        choices=("limited", "exhaustive"),
+        default="limited",
+        help="limited tests four selected steps; exhaustive tests every timestep",
+    )
     return parser.parse_args()
 
 
@@ -201,7 +207,7 @@ def diagnose(
     reference: Any,
     reference_params: Any,
     max_steps: int,
-    repair_budget: int,
+    repair_budget: int | None,
 ) -> dict[str, Any]:
     reference_actions, kl_scores = reference_action_diagnostics(
         env,
@@ -226,12 +232,16 @@ def diagnose(
             "candidates": set(),
             "top_repair": None,
         }
-    candidates = candidate_steps(
-        episode,
-        reference_actions,
-        kl_scores,
-        rule_scores,
-        repair_budget,
+    candidates = (
+        set(range(len(episode.steps)))
+        if repair_budget is None
+        else candidate_steps(
+            episode,
+            reference_actions,
+            kl_scores,
+            rule_scores,
+            repair_budget,
+        )
     )
     repairs = counterfactual_splice_profile(
         env,
@@ -360,10 +370,10 @@ def aggregate(
         reason = "Too few eligible held-out failures to test every planted weakness."
     elif all(gate["pass"] for gate in gates.values()):
         verdict = "CONTROLLED_GATE_PASS"
-        reason = "All preregistered controlled localization gates passed."
+        reason = "All predefined controlled localization gates passed."
     else:
         verdict = "UNSUCCESSFUL"
-        reason = "At least one preregistered evaluator gate failed with sufficient cases."
+        reason = "At least one predefined evaluator gate failed with sufficient cases."
     return {
         "verdict": verdict,
         "reason": reason,
@@ -400,7 +410,7 @@ def plot_summary(
     colors = ["#f2a541", "#7f8c8d", "#7f8c8d", "#7f8c8d"]
     axes[1].bar(method_labels, hits, color=colors)
     axes[1].set_ylim(0, 1)
-    axes[1].set_ylabel("fractional exact-step hit")
+    axes[1].set_ylabel("fractional defect-interval hit")
     axes[1].set_title("Held-out localization")
 
     gate_names = [name for name in summary["gates"] if name != "eligible_cases"]
@@ -491,6 +501,7 @@ def main() -> int:
         )
 
     env = make_overcooked_env(args.jaxaht, max_steps, "cramped_room", random_reset=True)
+    effective_repair_budget = None if args.candidate_mode == "exhaustive" else repair_budget
     if args.ego_mode == "heuristic":
         healthy_policy = make_overcooked_partner(
             args.jaxaht,
@@ -561,7 +572,7 @@ def main() -> int:
                     reference,
                     reference_params,
                     max_steps,
-                    repair_budget,
+                    effective_repair_budget,
                 )
                 healthy_top = healthy_diagnosis["top_repair"]
                 healthy_rows.append(
@@ -597,8 +608,11 @@ def main() -> int:
                     seed,
                     max_steps,
                 )
-                true_steps = {
+                trigger_steps = {
                     record.step for record in faulty.steps if record.ego_defect_triggered
+                }
+                true_steps = {
+                    record.step for record in faulty.steps if record.ego_defect_suppressed
                 }
                 planted_loss = healthy.total_return - faulty.total_return
                 eligible = bool(
@@ -617,7 +631,8 @@ def main() -> int:
                         "faulty_return": faulty.total_return,
                         "witness_return": witness.total_return,
                         "planted_loss": planted_loss,
-                        "trigger_count": len(true_steps),
+                        "first_trigger_count": len(trigger_steps),
+                        "suppressed_step_count": len(true_steps),
                         "eligible": eligible,
                     }
                 )
@@ -637,7 +652,7 @@ def main() -> int:
                     reference,
                     reference_params,
                     max_steps,
-                    repair_budget,
+                    effective_repair_budget,
                 )
                 top = diagnosis["top_repair"]
                 top_gain = 0.0 if top is None else top.gain
@@ -687,8 +702,10 @@ def main() -> int:
         "mode": args.mode,
         "ego_mode": args.ego_mode,
         "reference_mode": args.reference_mode,
+        "candidate_mode": args.candidate_mode,
+        "ground_truth_mode": "all_suppressed_steps",
         "max_steps": max_steps,
-        "repair_budget": repair_budget,
+        "repair_budget": "all_timesteps" if effective_repair_budget is None else repair_budget,
         "diagnosis_quota_per_split_and_type": diagnosis_quota,
         "healthy_quota_per_split_and_policy": healthy_quota,
         "discovery_policies": [spec.name for spec in PARTNERS if spec.split == "discovery"],

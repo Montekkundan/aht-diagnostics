@@ -38,7 +38,11 @@ class PlantedDefectTests(unittest.TestCase):
         trigger_steps = [
             record.step for record in episode.steps if record.ego_defect_triggered
         ]
+        suppressed_steps = [
+            record.step for record in episode.steps if record.ego_defect_suppressed
+        ]
         self.assertEqual(len(trigger_steps), 1)
+        self.assertIn(trigger_steps[0], suppressed_steps)
 
         repairs = counterfactual_splice_profile(
             env,

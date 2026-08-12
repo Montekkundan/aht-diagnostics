@@ -43,6 +43,7 @@ class StepRecord:
     ego_base_action: int
     ego_defect_type: str
     ego_defect_triggered: bool
+    ego_defect_suppressed: bool
     expected_repair_event: str
 
 
@@ -127,6 +128,7 @@ def _policy_step(
         "base_action": action_int,
         "defect_type": "healthy",
         "defect_triggered": False,
+        "defect_suppressed": False,
         "expected_repair_event": "none",
         **metadata,
     }
@@ -250,6 +252,7 @@ def _take_step(
         ego_base_action=int(ego_metadata["base_action"]),
         ego_defect_type=str(ego_metadata["defect_type"]),
         ego_defect_triggered=bool(ego_metadata["defect_triggered"]),
+        ego_defect_suppressed=bool(ego_metadata["defect_suppressed"]),
         expected_repair_event=str(ego_metadata["expected_repair_event"]),
     )
     next_snapshot = Snapshot(

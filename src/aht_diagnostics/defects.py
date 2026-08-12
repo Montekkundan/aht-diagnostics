@@ -128,6 +128,7 @@ class InteractionSuppressionPolicy:
             "base_action": base_action_int,
             "defect_type": self.defect.name,
             "defect_triggered": starts_now,
+            "defect_suppressed": suppressed,
             "expected_repair_event": self.defect.expected_repair_event,
             "suppressed_event": event,
         }

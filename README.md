@@ -8,7 +8,7 @@ Code for the controlled Overcooked causal-localization experiment on frozen JaxA
 - `src/aht_diagnostics/`: semantic event extraction, defect wrappers, exact replay, and counterfactual repair.
 - `tests/`: deterministic replay, semantic labeling, and planted-defect tests.
 - `data/checkpoint_manifest.json`: pinned Hugging Face checkpoint revision and paths.
-- `results/localization_gate_matched_pilot/`: final matched-BR pilot outputs.
+- `results/localization_gate_exhaustive_pilot/`: exhaustive matched-BR pilot outputs.
 
 ## Run
 
@@ -21,10 +21,11 @@ PYTHONPATH=src \
 conda run -n jax-aht python scripts/run_localization_gate.py \
   --jaxaht /path/to/jax-aht \
   --checkpoint-root data/checkpoints/hf \
-  --output results/localization_gate_matched_pilot \
+  --output results/localization_gate_exhaustive_pilot \
   --mode pilot \
   --ego-mode heuristic \
-  --reference-mode matched
+  --reference-mode matched \
+  --candidate-mode exhaustive
 ```
 
 ## Test
@@ -39,4 +40,4 @@ conda run -n jax-aht python -m unittest discover -s tests -v
 
 ## Result
 
-The matched-BR pilot was unsuccessful: it failed the predefined localization and repair gates. See [`summary.json`](results/localization_gate_matched_pilot/summary.json) and [`localization_gate.png`](results/localization_gate_matched_pilot/localization_gate.png).
+Exhaustive replay corrected the earlier candidate-selection failure: semantic localization reached `0.933`, localization AUROC reached `0.820`, and every planted failure had an outcome-improving repair. The pilot remains unsuccessful because repair gain did not beat the strongest event-rule baseline by the predefined margin. See [`summary.json`](results/localization_gate_exhaustive_pilot/summary.json) and [`localization_gate.png`](results/localization_gate_exhaustive_pilot/localization_gate.png).
