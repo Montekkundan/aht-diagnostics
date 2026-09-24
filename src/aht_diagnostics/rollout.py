@@ -45,6 +45,8 @@ class StepRecord:
     ego_defect_triggered: bool
     ego_defect_suppressed: bool
     expected_repair_event: str
+    ego_direction: int | None = None
+    partner_direction: int | None = None
 
 
 @dataclass(frozen=True)
@@ -70,6 +72,20 @@ class RepairRecord:
     ego_position: tuple[int, int]
     partner_position: tuple[int, int]
     window: int = 1
+
+
+@dataclass(frozen=True)
+class ContinuationResult:
+    """Outcome of replaying one branch from an exact saved snapshot."""
+
+    start_step: int
+    end_step: int
+    starting_return: float
+    total_return: float
+    remaining_return: float
+    intervention_steps: int
+    intervention_records: tuple[StepRecord, ...]
+    continuation_records: tuple[StepRecord, ...]
 
 
 def _scalar(value: Any) -> float:
@@ -254,6 +270,8 @@ def _take_step(
         ego_defect_triggered=bool(ego_metadata["defect_triggered"]),
         ego_defect_suppressed=bool(ego_metadata["defect_suppressed"]),
         expected_repair_event=str(ego_metadata["expected_repair_event"]),
+        ego_direction=before.directions[0] if before.directions else None,
+        partner_direction=before.directions[1] if len(before.directions) > 1 else None,
     )
     next_snapshot = Snapshot(
         step=snapshot.step + 1,
@@ -302,6 +320,47 @@ def rollout_episode(
     return Episode(seed, snapshot.cumulative_return, tuple(snapshots), tuple(records))
 
 
+def rollout_continuation(
+    env: Any,
+    snapshot: Snapshot,
+    ego_policy: Any,
+    ego_params: Any,
+    partner_policy: Any,
+    partner_params: Any,
+    max_steps: int,
+    ego_test_mode: bool = True,
+    partner_test_mode: bool = True,
+) -> ContinuationResult:
+    """Resume both factual policies from a saved snapshot without intervention."""
+
+    current = snapshot
+    records: list[StepRecord] = []
+    while current.step < max_steps and not bool(
+        np.asarray(current.done["__all__"]).squeeze()
+    ):
+        current, record = _take_step(
+            env,
+            current,
+            ego_policy,
+            ego_params,
+            partner_policy,
+            partner_params,
+            ego_test_mode,
+            partner_test_mode,
+        )
+        records.append(record)
+    return ContinuationResult(
+        start_step=snapshot.step,
+        end_step=current.step,
+        starting_return=snapshot.cumulative_return,
+        total_return=current.cumulative_return,
+        remaining_return=current.cumulative_return - snapshot.cumulative_return,
+        intervention_steps=0,
+        intervention_records=(),
+        continuation_records=tuple(records),
+    )
+
+
 def rollout_repair(
     env: Any,
     snapshot: Snapshot,
@@ -339,32 +398,126 @@ def rollout_repair(
     return current.cumulative_return, repaired_record.ego_event
 
 
-def _reference_states(
+def policy_states_on_factual_trajectory(
     env: Any,
     episode: Episode,
-    reference_policy: Any,
-    reference_params: Any,
-    reference_test_mode: bool,
+    policy: Any,
+    params: Any,
+    test_mode: bool = True,
 ) -> list[Any]:
-    """Track a repair policy on the factual trajectory without changing it."""
-    hstate = reference_policy.init_hstate(1, aux_info={"agent_id": 0})
+    """Track a policy's memory on the factual states without changing the rollout."""
+
+    hstate = policy.init_hstate(1, aux_info={"agent_id": 0})
     states: list[Any] = []
     for snapshot in episode.snapshots:
         states.append(hstate)
         avail = env.get_avail_actions(snapshot.env_state)["agent_0"]
         _, hstate, _, _ = _policy_step(
-            reference_policy,
-            reference_params,
+            policy,
+            params,
             snapshot.obs["agent_0"],
             snapshot.done["agent_0"],
             avail,
             hstate,
             jax.random.fold_in(snapshot.rng, 9173),
             snapshot.env_state,
-            reference_test_mode,
+            test_mode,
             _ego_aux(snapshot),
         )
     return states
+
+
+def rollout_policy_option(
+    env: Any,
+    snapshot: Snapshot,
+    ego_policy: Any,
+    ego_params: Any,
+    partner_policy: Any,
+    partner_params: Any,
+    controller_policy: Any,
+    controller_params: Any,
+    controller_hstate: Any,
+    max_option_steps: int,
+    max_steps: int,
+    *,
+    terminate_on_events: frozenset[str] = frozenset(),
+    ego_test_mode: bool = True,
+    partner_test_mode: bool = True,
+    controller_test_mode: bool = True,
+) -> ContinuationResult:
+    """Execute a temporary multi-step controller, then resume the frozen ego.
+
+    The teammate remains a live policy throughout the branch. The frozen ego's
+    recurrent state is updated using the observations and actual overridden
+    actions experienced during the intervention.
+    """
+
+    if max_option_steps < 0:
+        raise ValueError("max_option_steps must be non-negative")
+
+    current = snapshot
+    controller_rng = jax.random.fold_in(snapshot.rng, 9173)
+    intervention_records: list[StepRecord] = []
+    for _ in range(max_option_steps):
+        if current.step >= max_steps or bool(
+            np.asarray(current.done["__all__"]).squeeze()
+        ):
+            break
+        controller_rng, action_rng = jax.random.split(controller_rng)
+        avail = env.get_avail_actions(current.env_state)["agent_0"]
+        controller_action, controller_hstate, _, _ = _policy_step(
+            controller_policy,
+            controller_params,
+            current.obs["agent_0"],
+            current.done["agent_0"],
+            avail,
+            controller_hstate,
+            action_rng,
+            current.env_state,
+            controller_test_mode,
+            _ego_aux(current),
+        )
+        current, record = _take_step(
+            env,
+            current,
+            ego_policy,
+            ego_params,
+            partner_policy,
+            partner_params,
+            ego_test_mode,
+            partner_test_mode,
+            ego_action_override=controller_action,
+        )
+        intervention_records.append(record)
+        if record.ego_event in terminate_on_events:
+            break
+
+    continuation_records: list[StepRecord] = []
+    while current.step < max_steps and not bool(
+        np.asarray(current.done["__all__"]).squeeze()
+    ):
+        current, record = _take_step(
+            env,
+            current,
+            ego_policy,
+            ego_params,
+            partner_policy,
+            partner_params,
+            ego_test_mode,
+            partner_test_mode,
+        )
+        continuation_records.append(record)
+
+    return ContinuationResult(
+        start_step=snapshot.step,
+        end_step=current.step,
+        starting_return=snapshot.cumulative_return,
+        total_return=current.cumulative_return,
+        remaining_return=current.cumulative_return - snapshot.cumulative_return,
+        intervention_steps=len(intervention_records),
+        intervention_records=tuple(intervention_records),
+        continuation_records=tuple(continuation_records),
+    )
 
 
 def rollout_policy_splice(
@@ -528,7 +681,7 @@ def counterfactual_splice_profile(
     candidate_steps: set[int] | None = None,
 ) -> list[RepairRecord]:
     """Find short feasible-policy interventions that repair a failed rollout."""
-    reference_hstates = _reference_states(
+    reference_hstates = policy_states_on_factual_trajectory(
         env,
         episode,
         reference_policy,

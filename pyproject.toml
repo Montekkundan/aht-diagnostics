@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "aht-diagnostics"
 version = "0.1.0"
-description = "Counterfactual cooperative-failure diagnostics for frozen agents"
+description = "Fixed-ego cooperative weakness experiments in Overcooked"
 requires-python = ">=3.11"
 
 [tool.setuptools.packages.find]

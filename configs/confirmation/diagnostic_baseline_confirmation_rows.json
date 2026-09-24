@@ -1,0 +1,20 @@
+{
+  "status": "prospective_diagnostic_baseline_confirmation_rows",
+  "machine_readable_protocol": "configs/confirmation/diagnostic_baseline_confirmation_protocol.json",
+  "source_results": "results/confirmation/diagnostic_baseline_training/per_state",
+  "project_head": "17c9d44ee444d1374a67c12e2286faf0804a8f08",
+  "environment_condition": "randomized_sparse",
+  "max_steps": 400,
+  "episode_seed_range": {"start": 240000, "end_exclusive": 240150},
+  "expected_episode_seed_range": {"start": 240000, "end_exclusive": 240150},
+  "expected_episode_count": 150,
+  "minimum_lock_steps": 8,
+  "competence_return_threshold": 20.0,
+  "expected_train_seeds": [60374, 60375, 60376, 60377, 60378, 60379, 60380, 60381, 60382, 60383, 60384, 60385],
+  "expected_jaxaht_provenance": {
+    "local_head": "e834de05898e8dfc82518abd9fd2d3fcd595edeb",
+    "rotate_source_commit": "7d6b749882c552c2521549ba5d6194fd8f5b3e35",
+    "working_tree_clean": true
+  },
+  "claim_scope": "Prospective canonical factual and learned-reference export on twelve newly trained policies and 150 untouched starts."
+}

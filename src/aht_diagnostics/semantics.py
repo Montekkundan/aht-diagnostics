@@ -31,6 +31,7 @@ class OvercookedStateView:
     positions: tuple[tuple[int, int], ...]
     inventories: tuple[str, ...]
     pot_statuses: tuple[int, ...]
+    directions: tuple[int, ...] = ()
 
 
 def _unwrap_state(env_state: Any) -> Any:
@@ -57,7 +58,13 @@ def state_view(env_state: Any) -> OvercookedStateView:
     maze = np.asarray(raw.maze_map)
     pot_cells = np.argwhere(maze[:, :, 0] == POT_INDEX)
     pot_statuses = tuple(sorted(int(maze[row, column, 2]) for row, column in pot_cells))
-    return OvercookedStateView(positions, inventories, pot_statuses)
+    directions = tuple(int(value) for value in np.asarray(raw.agent_dir_idx).reshape(-1))
+    return OvercookedStateView(
+        positions=positions,
+        inventories=inventories,
+        pot_statuses=pot_statuses,
+        directions=directions,
+    )
 
 
 def semantic_event(
@@ -96,6 +103,13 @@ def semantic_event(
         return "wait"
     if before.positions[agent_index] != after.positions[agent_index]:
         return "move"
+    if (
+        action < STAY_ACTION
+        and len(before.directions) > agent_index
+        and len(after.directions) > agent_index
+        and before.directions[agent_index] != after.directions[agent_index]
+    ):
+        return "orientation_change"
     return "blocked_move"
 
 

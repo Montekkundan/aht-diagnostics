@@ -3,11 +3,19 @@ import unittest
 from aht_diagnostics.semantics import OvercookedStateView, semantic_event
 
 
-def view(*, inventory="empty", partner_inventory="empty", pots=(23,), position=(1, 1)):
+def view(
+    *,
+    inventory="empty",
+    partner_inventory="empty",
+    pots=(23,),
+    position=(1, 1),
+    direction=0,
+):
     return OvercookedStateView(
         positions=(position, (3, 1)),
         inventories=(inventory, partner_inventory),
         pot_statuses=pots,
+        directions=(direction, 0),
     )
 
 
@@ -66,6 +74,25 @@ class OvercookedSemanticTests(unittest.TestCase):
             reward=0.0,
         )
         self.assertEqual(moved, "move")
+        self.assertEqual(blocked, "blocked_move")
+
+    def test_distinguishes_turning_in_place_from_a_blocked_move(self):
+        turned = semantic_event(
+            view(position=(1, 1), direction=0),
+            view(position=(1, 1), direction=1),
+            agent_index=0,
+            action=1,
+            reward=0.0,
+        )
+        blocked = semantic_event(
+            view(position=(1, 1), direction=1),
+            view(position=(1, 1), direction=1),
+            agent_index=0,
+            action=1,
+            reward=0.0,
+        )
+
+        self.assertEqual(turned, "orientation_change")
         self.assertEqual(blocked, "blocked_move")
 
 

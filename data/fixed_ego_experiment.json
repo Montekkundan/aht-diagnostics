@@ -1,0 +1,22 @@
+{
+  "research_question": "Given a fixed role-specialized Overcooked ego, can regret-maximizing teammate generation discover a feasible cooperative convention that exposes the ego's known weakness?",
+  "hypothesis": "Against an onion-specialized ego, the ROTATE per-state-regret teammate generator will learn a coherent convention that also prioritizes onion preparation. The generated teammate will complete the task with its learned best response but perform poorly with the fixed ego, revealing the ego's inability to switch to plating and delivery. The hypothesis is not supported if the return gap is caused mainly by blocking, idling, or another form of sabotage.",
+  "environment": "overcooked-v1/cramped_room",
+  "fixed_ego": {
+    "checkpoint": "overcooked_v1_cramped_room/cramped_room_plate_agent_0_1_serious/2026-03-16_12-43-21/ego_train_run",
+    "training_partner": "plate_agent_0.1",
+    "expected_role": "onion-focused",
+    "reason": "This best response was trained with a plate-focused teammate. A five-episode behavior audit showed that it placed onions but did not pick up or deliver soup."
+  },
+  "comparisons": {
+    "per_trajectory_regret": "Uses the same policies, initialization procedure, training seeds and training budget but maximizes regret only from complete trajectories. Comparing it with per-state regret tests whether ROTATE's per-state objective is better at finding coherent convention mismatches instead of sabotage.",
+    "handwritten_roles": "Onion-focused, plate-focused and independent policies are behavioral references used to interpret the learned convention; they are not performance baselines."
+  },
+  "measurements": {
+    "return_with_fixed_ego": "Measures whether the generated teammate exposes a weakness in the fixed ego.",
+    "return_with_best_response": "Measures whether the generated teammate can succeed with a capable partner rather than merely causing failure.",
+    "cooperative_regret": "The mean return with the learned best response minus the mean return with the fixed ego.",
+    "behavior": "Episode videos and semantic event counts are inspected to distinguish a coherent role mismatch from blocking, idling or other sabotage."
+  },
+  "uncertainty": "The preliminary study uses five independent training seeds and 20 evaluation episodes per seed. Means and 95% bootstrap confidence intervals are computed across seed-level means."
+}

@@ -3,5 +3,16 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+.venv/
 data/checkpoints/
-results/raw/
+results/
+research/
+docs/
+output/
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.log
+paper/*.out

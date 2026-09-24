@@ -1,0 +1,159 @@
+{
+  "status": "frozen_before_training_and_outcome_access",
+  "date_frozen": "2026-09-22",
+  "research_question": "Among observed zero-return episodes from newly trained teammate policies and untouched environment starts, does the frozen diagnosis-aware trigger find more cases in which the same-start learned reference succeeds than an equal-budget factual-event baseline, and what causal evidence is observed after those failures are selected?",
+  "environment": {
+    "layout": "cramped_room",
+    "condition": "randomized_sparse",
+    "max_steps": 400,
+    "player_order": {
+      "agent_0": "fixed ego or learned reference",
+      "agent_1": "generated teammate"
+    }
+  },
+  "training": {
+    "train_seeds": [60374, 60375, 60376, 60377, 60378, 60379, 60380, 60381, 60382, 60383, 60384, 60385],
+    "objective": "gae_ps_regret_ts_weighted",
+    "lambda_1": 10.0,
+    "lambda_2": 1.0,
+    "timesteps_per_policy": 5120000,
+    "updates_per_policy": 50,
+    "environment_steps_per_update": 102400,
+    "total_timesteps": 61440000,
+    "retain_all_completed_policies": true,
+    "replace_failed_seed_after_outcome_access": false
+  },
+  "evaluation": {
+    "episode_seed_range": {
+      "start": 240000,
+      "end_exclusive": 240150
+    },
+    "expected_policy_count": 12,
+    "expected_start_count": 150,
+    "expected_cells": 1800,
+    "complete_rectangle_required": true,
+    "competence_return_threshold": 20.0
+  },
+  "factual_event_burden_weights": {
+    "ego_blocked_move_rate": 1.0,
+    "partner_blocked_move_rate": 1.0,
+    "ego_interact_no_effect_rate": 1.0,
+    "partner_interact_no_effect_rate": 1.0,
+    "ego_nonempty_wait_rate": 1.0,
+    "partner_nonempty_wait_rate": 1.0,
+    "duplicate_cooperative_event_rate": 1.0
+  },
+  "primary_acquisition_endpoint": {
+    "query_budget_per_policy": 12,
+    "query_budget_source": "Eight percent of 150 starts, fixed from the exposed development nomination rate of 40 out of 500 cells before confirmation outcomes are available.",
+    "shared_failure_priority": "Every selector ranks factual zero-return cells before positive-return cells. Within each return stratum it applies its own score. If a policy has fewer than twelve zero-return cells, every selector fills the remaining budget from positive-return cells using the same tie rule.",
+    "diagnosis_aware_score": "After shared zero-return priority, one when either frozen candidate trigger is present and zero otherwise; ties at the per-policy budget boundary receive uniform expected selection weight.",
+    "event_baseline": "After shared zero-return priority, equal-weight factual-event burden; ties at the same per-policy budget boundary receive uniform expected selection weight.",
+    "shared_outcome": {
+      "name": "competence_witnessed_failure",
+      "definition": "Within the shared observed-failure stratum, the same-start learned reference earns at least 20. The stored binary label is factual sparse return equals zero and reference return is at least 20, and is defined for all 1,800 cells without using either diagnosis trigger or any counterfactual intervention.",
+      "candidate_trigger_determines_label": false,
+      "counterfactual_intervention_determines_label": false
+    },
+    "policy_level_yield": "Expected same-start reference-competent cases among the twelve selected cells divided by twelve, after every selector receives identical zero-return priority.",
+    "difference": "Mean policy-level yield of diagnosis-aware selection minus mean policy-level yield of factual-event burden.",
+    "decision": {
+      "supported": "policy-cluster bootstrap 95% lower bound is greater than zero",
+      "contradicted": "policy-cluster bootstrap 95% upper bound is less than zero",
+      "otherwise": "inconclusive"
+    }
+  },
+  "candidate_level_control_analysis": {
+    "definition": "Among every frozen event-rule nomination, cross-tabulate factual nomination, primary-only intervention result and full controlled-suite decision.",
+    "measurements": [
+      "fraction of evaluable primary-only positives changed to ambiguous or no_supported_limitation by matched controls",
+      "policies and starts containing changed conclusions",
+      "normalized factual-rollout, reference-rollout and counterfactual-branch cost",
+      "representative exact traces"
+    ],
+    "interpretation": "Descriptive evidence that matched controls alter or preserve conclusions. Without external semantic ground truth this is not an accuracy or superiority test."
+  },
+  "bootstrap": {
+    "replicates": 10000,
+    "rng_seed": 20260922,
+    "primary": "resample the twelve policy IDs with replacement and recompute the paired mean policy-level yield difference",
+    "sensitivities": [
+      "two_way_policy_by_start_bootstrap_with_selection_recomputed",
+      "exact_paired_policy_sign_flip_test",
+      "leave_one_policy_out",
+      "leave_one_start_out"
+    ]
+  },
+  "secondary_descriptive_analyses": [
+    "actionable_causal_rescue_among_applicable_candidate_contexts",
+    "raw_approximate_reference_gap",
+    "random_acquisition",
+    "zero_return_acquisition",
+    "competence_witness_acquisition",
+    "diagnosis_aware_vs_raw_gap_acquisition",
+    "diagnosis_aware_vs_random_acquisition",
+    "subtype_counts",
+    "per_policy_and_per_start_estimates",
+    "branch_cost_per_supported_diagnosis",
+    "branch_cost_per_downgrade"
+  ],
+  "exclusions_and_stopping": {
+    "interim_outcome_inspection": false,
+    "outcome_based_early_stopping": false,
+    "exclude_zero_returns": false,
+    "exclude_negative_reference_gaps": false,
+    "exclude_low_competence": false,
+    "exclude_no_candidate_cells": false,
+    "exclude_ambiguous_outputs": false,
+    "invalid_replay_acquisition_value": 0,
+    "invalid_replay_specificity_denominator": false,
+    "infrastructure_retry": "retry only with identical seed, configuration and software revision; log every attempt",
+    "incomplete_rectangle": "report confirmation incomplete; do not analyze a convenient subset"
+  },
+  "provenance_freeze": {
+    "aht_diagnostics_git_head": "17c9d44ee444d1374a67c12e2286faf0804a8f08",
+    "jaxaht_git_head": "e834de05898e8dfc82518abd9fd2d3fcd595edeb",
+    "jaxaht_rotate_source_commit": "7d6b749882c552c2521549ba5d6194fd8f5b3e35",
+    "jaxaht_working_tree_clean": true,
+    "fixed_ego_checkpoint_tree_sha256": "e9f7b8a310bf17646bc823acfd4bd2e3f0161fb072a893001b9331a639f4e7a4",
+    "sha256": {
+      "data/fixed_ego_experiment.json": "024bc3923b70c2b2233845612f4dfdfe19990f736e3bea9b22a531fdde9d3ffa",
+      "data/checkpoints.json": "b0afe075fd71a366e8779d26630c27aa5da56c41f9eab25d160a586d83fd8814",
+      "scripts/run_confirmation_training.py": "5106067a5184b7080e64bd8d4f5f6e282039f6e614a56299f218e26c028550ef",
+      "scripts/run_fixed_ego_teamgen.py": "4120c618595c604a198fbf2a82cab92499a3d6126bcc6bb206792726ddd266f7",
+      "scripts/export_diagnostic_baseline_rows.py": "eaf72727e401c396e88de6372887c0c5ac9bbf456176b2e2e4cf6b36643471f5",
+      "scripts/analyze_soup_carrier_swap_lock.py": "557bfa8f60b10cc5a17277cc7dc06f42892f9ec87d74b8ccc74035c61430de70",
+      "scripts/analyze_initial_completed_soup_delivery.py": "7b6bf67fde8a6103bec0ae7a0fb910bc34ec566b647d00408de841b30076de5c",
+      "scripts/screen_soup_carrier_swap_lock_capable_controls.py": "1433443301017a1a87c3bc0feb8d8ae3b8ccd87c7960415a0e50c1f1ebcfa7a5",
+      "scripts/summarize_diagnostic_suite.py": "e0df0f1eb850e87cc9f97872733df8a5f182164a57d6cd084df703b00ccb8aed",
+      "scripts/compare_diagnostic_baselines.py": "048484b17a17ea7d3abcfaf398d14f8aabf019369266a668dfe128c3df0b6673",
+      "src/aht_diagnostics/__init__.py": "90ff701180b1123f686d24fffc0c5de07be71ab5c569631b586788b4cac60df8",
+      "src/aht_diagnostics/baselines.py": "6049b84b510c7345fbae4e81322a6e459842da8be6423bb3677bcf515cf5c90e",
+      "src/aht_diagnostics/baseline_evaluation.py": "3de9112fefead2ca42d9ffc0e4799c1e1f9b200ca431ef9326634c53c4b24dbb",
+      "src/aht_diagnostics/confirmatory_statistics.py": "10a46fe30eacfb12ac41aa2ce15cd91a0eb98c69aac0257b8cb49f51f8a5df01",
+      "src/aht_diagnostics/defects.py": "a7092a93f4b670acb50960b6687a26aa470b6725e8c6069322aabd66ca8b428d",
+      "src/aht_diagnostics/evaluation_conditions.py": "f61262c09ddf9caf24beb55e621e853cbdb83d1ee106ecd62ceb19b8a2d24731",
+      "src/aht_diagnostics/freeze.py": "ec48dd22f48dbd8834cc29aab9fba54239caeadfe009133b76d78d8cfe657968",
+      "src/aht_diagnostics/diagnostic_suite.py": "21268f6e5e623923198ef22dfa0350cb9b011d8313adec9806ce03be7f2cba93",
+      "src/aht_diagnostics/diagnosis.py": "711b0aaa1d866d4f3bdb1e9688d23a3cba359aaaf9ae2424e54b0141bcd3d843",
+      "src/aht_diagnostics/interventions.py": "daeb7f7a0b10f4e402f8dd8d6b9f7141aa05d7897cf178f28e177bdcc8f6f3a8",
+      "src/aht_diagnostics/natural_failure.py": "58851e82656b24848809aa7addef69281c0c81f03ae79357209fc9010e469607",
+      "src/aht_diagnostics/rollout.py": "21b86224412907dae2696f868da3f299056ef28db99f58a50342b8e14f062913",
+      "src/aht_diagnostics/semantics.py": "e77b31a21e491183652656b4d5b2eeb039610f71a5e488f89a5cda28fa849636",
+      "src/aht_diagnostics/teamgen.py": "5e608a345d012604f80e9de69034ddc480e746fd792e34b910b868a3e5adec13",
+      "src/aht_diagnostics/jaxaht_bridge.py": "04d7b0b43901ada81789e8814a62a2695c3bd19df96931779e95cf77dac02ee8",
+      "src/aht_diagnostics/behavior_penalty.py": "8499c1942bb7a6c7ec38f0e42c50b659fd56def6f38c7f4ac1fd40e574981d4a",
+      "configs/confirmation/diagnostic_baseline_confirmation_rows.json": "3cdd2bc27b0327f2560890303ccb6d471b79933ee16d9ece2466c4277cf0988c",
+      "configs/confirmation/diagnostic_baseline_confirmation_swap_lock.json": "9df2ba6fa673533fcb921764eeda70e2a3475392d8281f3774e68e0b01cced8d",
+      "configs/confirmation/diagnostic_baseline_confirmation_initial_soup.json": "afdfcd350a6f8e009cbc6173f5760226426c3883fe6257fbcbe9e07d860f157c",
+      "configs/confirmation/diagnostic_baseline_confirmation_capable_control.json": "97030acc078728e330fa2f85e7fb20f4b9cb4e7d1f819adc25653021c20c9c23",
+      "configs/confirmation/diagnostic_baseline_confirmation_comparison.json": "61d555514256a3c30df1f6ae1b2a41f60433090438b542f24c9006d48305c5c6",
+      "jaxaht/open_ended_training/rotate.py": "bde2917a1220a011812e083949fe3c4ec0b96fe22c6abffe269254c718f91875",
+      "jaxaht/open_ended_training/configs/algorithm/rotate/_base_.yaml": "5533618741a4b98f10efa32d3a45193e9c7b9e4f42c3235146ea42a932ec2c69",
+      "jaxaht/open_ended_training/configs/algorithm/rotate/overcooked-v1/cramped_room.yaml": "13c09e5dcc2cdbd2f4407e08e9c91e46b81b39aa1efdc90d00613f28adc6d3a9",
+      "jaxaht/open_ended_training/configs/task/overcooked-v1/cramped_room.yaml": "998d22c09a231bd743a2c12364d705a7b43c1f678238a544d4c3a3a6cb6d170a"
+    },
+    "note": "The protocol file omits its own digest to avoid a self-referential hash. All uncommitted code and configuration inputs that can affect training, evaluation, diagnosis or analysis are frozen by content digest here."
+  },
+  "claim_scope": "Independent confirmation of reference-competent case acquisition among observed zero-return episodes, with descriptive causal follow-up for one fixed ego, one layout and two predefined diagnosis families. Every selector receives the same factual zero-return indicator before its method-specific score is applied. The trigger-independent target does not prove that a semantic diagnosis is correct. Actionable causal rescue and matched-control results are secondary evidence only. The study cannot establish broad cooperative diagnosis, cross-layout transfer or paper readiness by itself."
+}

@@ -1,0 +1,14 @@
+{
+  "status": "prospective_diagnostic_baseline_confirmation",
+  "source_results": "results/confirmation/diagnostic_baseline_training/per_state",
+  "environment_condition": "randomized_sparse",
+  "max_steps": 400,
+  "episode_seed_range": {"start": 240000, "end_exclusive": 240150},
+  "reference_option_budget": 16,
+  "delivery_option_budget": 16,
+  "minimum_remaining_steps": 16,
+  "require_zero_factual_return": true,
+  "primary_comparison": "reference_actions_no_interact",
+  "negative_control": "reference_actions_wait",
+  "claim_scope": "Prospective frozen initial-soup component on twelve newly trained teammate policies and 150 untouched starts."
+}

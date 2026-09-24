@@ -6,7 +6,11 @@ from aht_diagnostics.jaxaht_bridge import (
     make_overcooked_env,
     make_overcooked_partner,
 )
-from aht_diagnostics.rollout import reference_action_trace, rollout_episode
+from aht_diagnostics.rollout import (
+    reference_action_trace,
+    rollout_continuation,
+    rollout_episode,
+)
 
 
 JAXAHT = os.environ.get("JAXAHT_PATH")
@@ -36,6 +40,39 @@ class OvercookedReplayTests(unittest.TestCase):
 
         _, action_kl = reference_action_trace(env, first, ego, None)
         self.assertAlmostEqual(action_kl, 0.0)
+
+    @unittest.skipUnless(JAXAHT, "JAXAHT_PATH is not set")
+    def test_no_change_continuation_reproduces_episode_suffix(self):
+        root = Path(JAXAHT)
+        env = make_overcooked_env(root, 100, random_reset=False)
+        ego = make_overcooked_partner(root, "independent")
+        partner = make_overcooked_partner(root, "onion", p_onion_on_counter=0.1)
+        episode = rollout_episode(env, ego, None, partner, None, seed=29, max_steps=100)
+        snapshot_index = 30
+
+        replay = rollout_continuation(
+            env,
+            episode.snapshots[snapshot_index],
+            ego,
+            None,
+            partner,
+            None,
+            max_steps=100,
+        )
+
+        self.assertEqual(replay.total_return, episode.total_return)
+        self.assertEqual(
+            [record.ego_action for record in replay.continuation_records],
+            [record.ego_action for record in episode.steps[snapshot_index:]],
+        )
+        self.assertEqual(
+            [record.partner_action for record in replay.continuation_records],
+            [record.partner_action for record in episode.steps[snapshot_index:]],
+        )
+        self.assertEqual(
+            [record.ego_event for record in replay.continuation_records],
+            [record.ego_event for record in episode.steps[snapshot_index:]],
+        )
 
 
 if __name__ == "__main__":

@@ -1,0 +1,11 @@
+{
+  "status": "prospective_diagnostic_baseline_confirmation_capable_control",
+  "source_results": "results/confirmation/diagnostic_baseline_training/per_state",
+  "source_confirmation": "results/confirmation/diagnostic_baseline_confirmation_swap_lock.json",
+  "environment_condition": "randomized_sparse",
+  "max_steps": 400,
+  "episode_seed_range": {"start": 240000, "end_exclusive": 240150},
+  "minimum_lock_steps": 8,
+  "competence_return_threshold": 20.0,
+  "claim_scope": "Prospective same-start learned-reference competence and reciprocal-motion false-positive control for the diagnostic baseline confirmation."
+}

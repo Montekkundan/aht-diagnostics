@@ -1,0 +1,14 @@
+{
+  "status": "prospective_diagnostic_baseline_confirmation",
+  "source_results": "results/confirmation/diagnostic_baseline_training/per_state",
+  "environment_condition": "randomized_sparse",
+  "max_steps": 400,
+  "episode_seed_range": {"start": 240000, "end_exclusive": 240150},
+  "minimum_lock_steps": 8,
+  "reference_windows": [4],
+  "reference_control_window": 4,
+  "confirmation_only": true,
+  "primary_comparison": "detour_down_left_2",
+  "negative_control": "control_wait_2",
+  "claim_scope": "Prospective frozen reciprocal-motion component on twelve newly trained teammate policies and 150 untouched starts."
+}

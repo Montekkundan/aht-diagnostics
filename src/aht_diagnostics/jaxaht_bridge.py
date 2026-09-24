@@ -59,6 +59,7 @@ def make_overcooked_partner(
     *,
     p_onion_on_counter: float = 0.0,
     p_plate_on_counter: float = 0.0,
+    using_log_wrapper: bool = False,
 ) -> Any:
     activate_jaxaht(jaxaht_path)
     from agents.overcooked.agent_policy_wrappers import (
@@ -74,7 +75,7 @@ def make_overcooked_partner(
     if role == "independent":
         return OvercookedIndependentPolicyWrapper(
             layout_config,
-            using_log_wrapper=False,
+            using_log_wrapper=using_log_wrapper,
             p_onion_on_counter=p_onion_on_counter,
             p_plate_on_counter=p_plate_on_counter,
         )
@@ -82,18 +83,24 @@ def make_overcooked_partner(
         return OvercookedOnionPolicyWrapper(
             layout_config,
             p_onion_on_counter=p_onion_on_counter,
-            using_log_wrapper=False,
+            using_log_wrapper=using_log_wrapper,
         )
     if role == "plate":
         return OvercookedPlatePolicyWrapper(
             layout_config,
             p_plate_on_counter=p_plate_on_counter,
-            using_log_wrapper=False,
+            using_log_wrapper=using_log_wrapper,
         )
     if role == "static":
-        return OvercookedStaticPolicyWrapper(layout_config, using_log_wrapper=False)
+        return OvercookedStaticPolicyWrapper(
+            layout_config,
+            using_log_wrapper=using_log_wrapper,
+        )
     if role == "random":
-        return OvercookedRandomPolicyWrapper(layout_config, using_log_wrapper=False)
+        return OvercookedRandomPolicyWrapper(
+            layout_config,
+            using_log_wrapper=using_log_wrapper,
+        )
     raise ValueError(f"Unknown Overcooked teammate role: {role}")
 
 
@@ -102,6 +109,7 @@ def load_frozen_s5_ego(
     checkpoint_path: str | Path,
     env: Any,
     seed: int = 0,
+    checkpoint_member: int = 0,
 ) -> tuple[Any, Any]:
     activate_jaxaht(jaxaht_path)
     from common.agent_loader_from_config import initialize_rl_agent_from_config
@@ -110,6 +118,7 @@ def load_frozen_s5_ego(
     if not checkpoint.exists():
         raise FileNotFoundError(f"Missing frozen ego checkpoint: {checkpoint}")
     config = dict(S5_CONFIG)
+    config["idx_list"] = [checkpoint_member]
     config["path"] = str(checkpoint)
     policy, selected_params, init_params, labels = initialize_rl_agent_from_config(
         config,

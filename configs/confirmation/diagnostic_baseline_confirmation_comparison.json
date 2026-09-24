@@ -1,0 +1,5 @@
+{
+  "status": "superseded_before_outcome_access",
+  "machine_readable_protocol": "configs/confirmation/diagnostic_baseline_confirmation_protocol.json",
+  "reason": "The original flat comparison config duplicated only part of the protocol and enabled a circular suite-defined acquisition endpoint. The comparator now consumes the single machine-readable protocol directly."
+}
