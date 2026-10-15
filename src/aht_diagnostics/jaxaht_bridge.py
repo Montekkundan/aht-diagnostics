@@ -31,6 +31,68 @@ def activate_jaxaht(path: str | Path) -> Path:
     return root
 
 
+def resolve_heldout_config(
+    agent_config: dict[str, Any],
+    eval_root: str | Path | None,
+) -> dict[str, Any]:
+    """Return a copy of a held-out entry with a relative checkpoint path made absolute."""
+    config = dict(agent_config)
+    path = config.get("path")
+    if path is not None and eval_root is not None and not Path(str(path)).is_absolute():
+        config["path"] = str(Path(eval_root).expanduser() / str(path))
+    return config
+
+
+def select_heldout_member(
+    loaded: dict[str, tuple[Any, Any, Any, Any]],
+    name: str,
+    label: str | None = None,
+) -> tuple[Any, Any, str]:
+    """Pick one learned member from JaxAHT's load_heldout_set output."""
+    if label is None:
+        if len(loaded) != 1:
+            raise ValueError(f"{name} holds {len(loaded)} agents; choose one of {sorted(loaded)}")
+        label = next(iter(loaded))
+    if label not in loaded:
+        raise KeyError(f"No held-out agent {label!r}; available: {sorted(loaded)}")
+    policy, params, _test_mode, _bounds = loaded[label]
+    if params is None:
+        raise ValueError(f"{label} is a scripted agent, not a learned policy")
+    return policy, params, label
+
+
+def load_heldout_agent(
+    jaxaht_path: str | Path,
+    env: Any,
+    task_name: str,
+    env_kwargs: dict[str, Any],
+    name: str,
+    label: str | None = None,
+    *,
+    eval_root: str | Path | None = None,
+    seed: int = 0,
+) -> tuple[Any, Any, str]:
+    """Load one learned agent from JaxAHT's held-out set so it can act as a frozen agent.
+
+    ``name`` is an entry of ``global_heldout_settings.yaml`` for ``task_name``
+    (for example ``ippo_mlp``) and ``label`` is JaxAHT's label for one member
+    (for example ``ippo_mlp (0)``). Relative checkpoint paths are resolved
+    against ``eval_root``, the JaxAHT tree that holds ``eval_teammates/``.
+    Returns ``(policy, params, label)``.
+    """
+    root = activate_jaxaht(jaxaht_path)
+    from evaluation.heldout_core import load_heldout_set
+    from omegaconf import OmegaConf
+
+    settings = OmegaConf.load(root / "evaluation" / "configs" / "global_heldout_settings.yaml")
+    block = OmegaConf.to_container(settings.heldout_set[task_name], resolve=True)
+    if block.get(name) is None:
+        raise KeyError(f"No held-out entry {name!r} for {task_name}; available: {sorted(block)}")
+    config = resolve_heldout_config(block[name], eval_root)
+    loaded = load_heldout_set({name: config}, env, task_name, env_kwargs, jax.random.PRNGKey(seed))
+    return select_heldout_member(loaded, name, label)
+
+
 def make_overcooked_env(
     jaxaht_path: str | Path,
     max_steps: int,
