@@ -27,9 +27,11 @@ from aht_diagnostics.rollout import rollout_episode  # noqa: E402
 from aht_diagnostics.teamgen import (  # noqa: E402
     CANONICAL_ROTATE_OBJECTIVE,
     OFFICIAL_ROTATE_REPOSITORY,
+    TRAINING_PRESETS,
     TRAJECTORY_REGRET_BASELINE,
     evidence_status,
     mean_and_bootstrap_ci,
+    partner_num_updates,
     summarize_pairing,
     training_overrides,
 )
@@ -45,6 +47,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--jaxaht", required=True, type=Path)
     parser.add_argument("--checkpoint-root", required=True, type=Path)
+    parser.add_argument("--layout", default="cramped_room")
     parser.add_argument(
         "--experiment",
         type=Path,
@@ -73,6 +76,25 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Override the released budget with an explicitly prespecified budget.",
     )
+    parser.add_argument(
+        "--preset",
+        choices=tuple(TRAINING_PRESETS),
+        default="jaxaht-expts",
+        help=(
+            "Teammate-generation hyperparameters. 'rotate-paper' uses the ROTATE "
+            "manuscript's Cramped Room settings (234 updates); the pinned "
+            "expts-branch config gives only 50 updates."
+        ),
+    )
+    parser.add_argument(
+        "--action-mode",
+        choices=("sample", "greedy"),
+        default="sample",
+        help=(
+            "Action selection for the summary evaluation. JaxAHT evaluates egos by "
+            "sampling; greedy selection turns transient collisions into deadlocks."
+        ),
+    )
     parser.add_argument("--videos", action="store_true")
     parser.add_argument(
         "--behavior-penalty",
@@ -86,16 +108,22 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_training_config(jaxaht: Path, mode: str, objective: str) -> dict[str, Any]:
+def load_training_config(
+    jaxaht: Path,
+    mode: str,
+    objective: str,
+    layout: str = "cramped_room",
+    preset: str = "jaxaht-expts",
+) -> dict[str, Any]:
     activate_jaxaht(jaxaht)
     from omegaconf import OmegaConf
 
     config_root = jaxaht / "open_ended_training" / "configs"
     base = OmegaConf.load(config_root / "algorithm" / "rotate" / "_base_.yaml")
     task_algorithm = OmegaConf.load(
-        config_root / "algorithm" / "rotate" / "overcooked-v1" / "cramped_room.yaml"
+        config_root / "algorithm" / "rotate" / "overcooked-v1" / f"{layout}.yaml"
     )
-    task = OmegaConf.load(config_root / "task" / "overcooked-v1" / "cramped_room.yaml")
+    task = OmegaConf.load(config_root / "task" / "overcooked-v1" / f"{layout}.yaml")
     merged = OmegaConf.merge(base, task_algorithm)
     config = OmegaConf.to_container(merged, resolve=True)
     config.pop("defaults", None)
@@ -109,6 +137,8 @@ def load_training_config(jaxaht: Path, mode: str, objective: str) -> dict[str, A
         }
     )
 
+    if mode != "smoke":
+        config.update(TRAINING_PRESETS[preset])
     config.update(training_overrides(mode, objective, int(config["ROLLOUT_LENGTH"])))
     config["TIMESTEPS_PER_ITER_PARTNER"] = int(
         config["TIMESTEPS_PER_ITER_PARTNER"]
@@ -152,6 +182,9 @@ def train_one_seed(
     evaluation_episodes: int,
     save_videos: bool,
     behavior_penalty_coefficient: float,
+    layout: str = "cramped_room",
+    preset: str = "jaxaht-expts",
+    action_mode: str = "sample",
 ) -> dict[str, Any]:
     started_at = time.perf_counter()
     activate_jaxaht(jaxaht)
@@ -165,7 +198,7 @@ def train_one_seed(
     from evaluation.vis_episodes import save_video
     from open_ended_training.rotate import train_regret_maximizing_partners
 
-    config = load_training_config(jaxaht, mode, objective)
+    config = load_training_config(jaxaht, mode, objective, layout, preset)
     if training_timesteps is not None:
         update_size = int(config["ROLLOUT_LENGTH"]) * 4 * int(config["NUM_ENVS"])
         if training_timesteps < update_size or training_timesteps % update_size:
@@ -229,10 +262,15 @@ def train_one_seed(
     )
 
     max_steps = 100 if mode == "smoke" else 400
-    evaluation_env = make_env(
-        config["ENV_NAME"],
-        {**config["ENV_KWARGS"], "max_steps": max_steps},
-    )
+    # Score the task itself: training uses shaped reward, evaluation does not.
+    evaluation_kwargs = {
+        **config["ENV_KWARGS"],
+        "max_steps": max_steps,
+        "do_reward_shaping": False,
+    }
+    evaluation_kwargs.pop("reward_shaping_params", None)
+    evaluation_env = make_env(config["ENV_NAME"], evaluation_kwargs)
+    greedy = action_mode == "greedy"
     episode_seeds = [train_seed * 1000 + index for index in range(evaluation_episodes)]
     with_fixed_ego = [
         rollout_episode(
@@ -243,6 +281,8 @@ def train_one_seed(
             learned_teammate,
             seed,
             max_steps,
+            ego_test_mode=greedy,
+            partner_test_mode=greedy,
         )
         for seed in episode_seeds
     ]
@@ -255,6 +295,8 @@ def train_one_seed(
             learned_teammate,
             seed,
             max_steps,
+            ego_test_mode=greedy,
+            partner_test_mode=greedy,
         )
         for seed in episode_seeds
     ]
@@ -266,7 +308,7 @@ def train_one_seed(
             video_env = make_env(
                 "overcooked-v1",
                 {
-                    "layout": "cramped_room",
+                    "layout": layout,
                     "max_steps": max_steps,
                     "random_reset": False,
                     "random_obj_state": False,
@@ -328,6 +370,9 @@ def train_one_seed(
         "videos": video_paths,
         "video_error": video_error,
         "training_seconds": float(time.perf_counter() - started_at),
+        "preset": preset,
+        "partner_num_updates": partner_num_updates(config),
+        "evaluation": {"reward": "sparse", "action_mode": action_mode},
         "behavior_penalty_per_event": behavior_penalty_coefficient,
         "effective_training_config": {
             key: config[key]
@@ -356,6 +401,12 @@ def main() -> int:
         raise ValueError("behavior penalty must be nonnegative")
     args.output = args.output.resolve()
     experiment = json.loads(args.experiment.read_text(encoding="utf-8"))
+    expected_environment = f"overcooked-v1/{args.layout}"
+    if experiment["environment"] != expected_environment:
+        raise ValueError(
+            f"Experiment environment {experiment['environment']!r} does not match "
+            f"requested {expected_environment!r}"
+        )
     checkpoint = args.checkpoint_root / experiment["fixed_ego"]["checkpoint"]
     if not checkpoint.exists():
         raise FileNotFoundError(f"Missing fixed ego checkpoint: {checkpoint}")
@@ -377,6 +428,9 @@ def main() -> int:
             evaluation_episodes=evaluation_episodes,
             save_videos=args.videos,
             behavior_penalty_coefficient=args.behavior_penalty,
+            layout=args.layout,
+            preset=args.preset,
+            action_mode=args.action_mode,
         )
         for train_seed in args.train_seeds
     ]
@@ -389,6 +443,7 @@ def main() -> int:
         "objective": args.objective,
         "objective_config_key": results[0]["effective_training_config"]["CONF_OBJ_TYPE"],
         "mode": args.mode,
+        "environment": expected_environment,
         "evidence_status": evidence_status(
             args.mode,
             training_timesteps_overridden=args.training_timesteps is not None,
