@@ -73,8 +73,13 @@ def semantic_event(
     agent_index: int,
     action: int,
     reward: float,
+    *,
+    terminal_autoreset: bool = False,
 ) -> str:
-    """Name the observable event caused by one agent action."""
+    """Name an observable event, or mark a reset-obscured terminal transition."""
+    if terminal_autoreset:
+        return "terminal_state_unobserved"
+
     before_item = before.inventories[agent_index]
     after_item = after.inventories[agent_index]
 

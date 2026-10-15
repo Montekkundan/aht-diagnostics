@@ -60,6 +60,19 @@ def test_factual_event_features_reject_empty_episode():
         factual_event_features(episode())
 
 
+def test_terminal_reset_is_not_counted_as_task_progress():
+    features = factual_event_features(
+        episode(
+            step("wait", "wait"),
+            step("terminal_state_unobserved", "terminal_state_unobserved"),
+        )
+    )
+    assert features["ego_terminal_state_unobserved_rate"] == 0.5
+    assert features["partner_terminal_state_unobserved_rate"] == 0.5
+    assert features["ego_wait_rate"] == 0.5
+    assert features["duplicate_cooperative_event_rate"] == 0.0
+
+
 def test_event_burden_requires_explicit_weights():
     features = {
         "ego_blocked_move_rate": 0.5,

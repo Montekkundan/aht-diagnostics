@@ -35,6 +35,7 @@ SEMANTIC_EVENT_NAMES = (
     "orientation_change",
     "pick_up_soup",
     "place_onion_in_pot",
+    "terminal_state_unobserved",
     "wait",
 )
 

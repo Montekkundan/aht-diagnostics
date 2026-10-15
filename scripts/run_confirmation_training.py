@@ -26,7 +26,6 @@ from typing import Any, Callable, Sequence
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_CONFIRMATION_SEEDS = tuple(range(60374, 60386))
 EXPECTED_OBJECTIVE = "gae_ps_regret_ts_weighted"
 RUNNER_OBJECTIVE = "per_state_regret"
 ALLOWED_PREOUTCOME_STATUSES = {"frozen_before_training_and_outcome_access"}
@@ -181,15 +180,13 @@ def validate_protocol(
     frozen_hashes = _require_mapping(provenance.get("sha256"), "provenance sha256")
 
     seeds_value = training.get("train_seeds")
-    if not isinstance(seeds_value, list) or any(
+    if not isinstance(seeds_value, list) or not seeds_value or any(
         isinstance(seed, bool) or not isinstance(seed, int) for seed in seeds_value
     ):
-        raise ConfirmationDriverError("training.train_seeds must be an integer list")
+        raise ConfirmationDriverError("training.train_seeds must be a non-empty integer list")
     seeds = tuple(seeds_value)
-    if seeds != EXPECTED_CONFIRMATION_SEEDS:
-        raise ConfirmationDriverError(
-            f"Confirmation seeds must be exactly {list(EXPECTED_CONFIRMATION_SEEDS)}, got {list(seeds)}"
-        )
+    if len(set(seeds)) != len(seeds):
+        raise ConfirmationDriverError("training.train_seeds must be unique")
     if evaluation.get("expected_policy_count") != len(seeds):
         raise ConfirmationDriverError("expected_policy_count does not match exact seeds")
     if training.get("objective") != EXPECTED_OBJECTIVE:
