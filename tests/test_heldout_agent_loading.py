@@ -1,7 +1,47 @@
 import unittest
 from pathlib import Path
 
-from aht_diagnostics.jaxaht_bridge import resolve_heldout_config, select_heldout_member
+import numpy as np
+
+from aht_diagnostics.jaxaht_bridge import FrozenAgent, resolve_heldout_config, select_heldout_member
+
+
+class _RecordingPolicy:
+    def __init__(self, pop_size=None):
+        if pop_size is not None:
+            self.pop_size = pop_size
+        self.seen = None
+        self.action_dim = 6
+
+    def get_action_value_policy(self, params, obs, done, avail_actions, hstate, rng,
+                                aux_obs=None, env_state=None):
+        self.seen = aux_obs
+        return "action", "value", "pi", hstate
+
+
+class FrozenAgentTests(unittest.TestCase):
+    def test_conditional_critic_gets_a_zero_teammate_id(self):
+        policy = _RecordingPolicy(pop_size=10)
+        obs = np.zeros((1, 3, 30))
+        out = FrozenAgent(policy).get_action_value_policy({}, obs, None, None, None, None)
+        self.assertEqual(out[0], "action")
+        self.assertEqual(policy.seen.shape, (1, 3, 10))
+        self.assertEqual(float(np.abs(np.asarray(policy.seen)).sum()), 0.0)
+
+    def test_plain_policy_keeps_missing_aux_obs(self):
+        policy = _RecordingPolicy()
+        FrozenAgent(policy).get_action_value_policy({}, np.zeros((1, 2, 30)), None, None, None, None)
+        self.assertIsNone(policy.seen)
+
+    def test_given_aux_obs_is_passed_through(self):
+        policy = _RecordingPolicy(pop_size=4)
+        given = np.ones((1, 2, 4))
+        FrozenAgent(policy).get_action_value_policy({}, np.zeros((1, 2, 30)), None, None, None, None,
+                                                    aux_obs=given)
+        self.assertIs(policy.seen, given)
+
+    def test_other_attributes_are_delegated(self):
+        self.assertEqual(FrozenAgent(_RecordingPolicy()).action_dim, 6)
 
 
 class ResolveHeldoutConfigTests(unittest.TestCase):
