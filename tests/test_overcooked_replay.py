@@ -18,6 +18,20 @@ JAXAHT = os.environ.get("JAXAHT_PATH")
 
 class OvercookedReplayTests(unittest.TestCase):
     @unittest.skipUnless(JAXAHT, "JAXAHT_PATH is not set")
+    def test_terminal_autoreset_is_not_labeled_as_an_action(self):
+        root = Path(JAXAHT)
+        env = make_overcooked_env(root, 20, random_reset=False)
+        static = make_overcooked_partner(root, "static")
+
+        episode = rollout_episode(env, static, None, static, None, seed=17, max_steps=20)
+
+        self.assertEqual(len(episode.steps), 20)
+        self.assertTrue(all(step.ego_event == "wait" for step in episode.steps[:-1]))
+        self.assertTrue(all(step.partner_event == "wait" for step in episode.steps[:-1]))
+        self.assertEqual(episode.steps[-1].ego_event, "terminal_state_unobserved")
+        self.assertEqual(episode.steps[-1].partner_event, "terminal_state_unobserved")
+
+    @unittest.skipUnless(JAXAHT, "JAXAHT_PATH is not set")
     def test_exact_seed_replay_is_deterministic_and_semantic(self):
         root = Path(JAXAHT)
         env = make_overcooked_env(root, 80, random_reset=False)

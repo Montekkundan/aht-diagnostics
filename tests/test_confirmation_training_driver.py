@@ -12,6 +12,7 @@ import pytest
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/run_confirmation_training.py"
+LEGACY_CONFIRMATION_SEEDS = tuple(range(60374, 60386))
 SPEC = importlib.util.spec_from_file_location("run_confirmation_training", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 driver = importlib.util.module_from_spec(SPEC)
@@ -36,7 +37,11 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _frozen_fixture(tmp_path: Path, timesteps: int = 160) -> dict[str, Path]:
+def _frozen_fixture(
+    tmp_path: Path,
+    timesteps: int = 160,
+    train_seeds: tuple[int, ...] = LEGACY_CONFIRMATION_SEEDS,
+) -> dict[str, Path]:
     repo = tmp_path / "repo"
     jaxaht = tmp_path / "jaxaht"
     checkpoint_root = repo / "checkpoints"
@@ -66,7 +71,7 @@ def _frozen_fixture(tmp_path: Path, timesteps: int = 160) -> dict[str, Path]:
     protocol = {
         "status": "frozen_before_training_and_outcome_access",
         "training": {
-            "train_seeds": list(driver.EXPECTED_CONFIRMATION_SEEDS),
+            "train_seeds": list(train_seeds),
             "objective": driver.EXPECTED_OBJECTIVE,
             "lambda_1": 10.0,
             "lambda_2": 1.0,
@@ -74,7 +79,7 @@ def _frozen_fixture(tmp_path: Path, timesteps: int = 160) -> dict[str, Path]:
             "retain_all_completed_policies": True,
             "replace_failed_seed_after_outcome_access": False,
         },
-        "evaluation": {"expected_policy_count": 12},
+        "evaluation": {"expected_policy_count": len(train_seeds)},
         "provenance_freeze": {
             "aht_diagnostics_git_head": "repo-head",
             "jaxaht_git_head": "jax-head",
@@ -185,6 +190,70 @@ def test_validation_rejects_protocol_digest_drift(tmp_path: Path) -> None:
         )
 
 
+def test_new_frozen_seed_cohort_runs_and_resumes(tmp_path: Path) -> None:
+    seeds = (70374, 70375)
+    paths = _frozen_fixture(tmp_path, train_seeds=seeds)
+    output = tmp_path / "new_confirmation"
+    manifest = driver.run_confirmation(
+        protocol_path=paths["protocol"],
+        expected_protocol_sha256=_digest(paths["protocol"]),
+        repo_root=paths["repo"],
+        jaxaht=paths["jaxaht"],
+        checkpoint_root=paths["checkpoint_root"],
+        output=output,
+        python=Path("/fake/python"),
+        evaluation_episodes=20,
+        git_reader=_fake_git,
+        process_runner=_successful_runner,
+    )
+    assert manifest["status"] == "completed"
+    assert manifest["identity"]["seeds"] == list(seeds)
+    assert set(manifest["completed_seeds"]) == {str(seed) for seed in seeds}
+    assert len(manifest["attempts"]) == len(seeds)
+    aggregate = json.loads((output / "per_state/summary.json").read_text())
+    assert aggregate["training_seeds"] == list(seeds)
+    assert [row["train_seed"] for row in aggregate["seed_results"]] == list(seeds)
+
+    def should_not_run(*args: Any, **kwargs: Any) -> SimpleNamespace:
+        raise AssertionError("verified completed seeds must be skipped on resume")
+
+    resumed = driver.run_confirmation(
+        protocol_path=paths["protocol"],
+        expected_protocol_sha256=_digest(paths["protocol"]),
+        repo_root=paths["repo"],
+        jaxaht=paths["jaxaht"],
+        checkpoint_root=paths["checkpoint_root"],
+        output=output,
+        python=Path("/fake/python"),
+        evaluation_episodes=20,
+        git_reader=_fake_git,
+        process_runner=should_not_run,
+    )
+    assert resumed == manifest
+
+
+@pytest.mark.parametrize(
+    ("seeds", "message"),
+    [
+        ((), "non-empty integer list"),
+        ((70374, 70374), "must be unique"),
+    ],
+)
+def test_validation_rejects_invalid_new_seed_lists(
+    tmp_path: Path, seeds: tuple[int, ...], message: str
+) -> None:
+    paths = _frozen_fixture(tmp_path, train_seeds=seeds)
+    with pytest.raises(driver.ConfirmationDriverError, match=message):
+        driver.validate_protocol(
+            protocol_path=paths["protocol"],
+            expected_protocol_sha256=_digest(paths["protocol"]),
+            repo_root=paths["repo"],
+            jaxaht=paths["jaxaht"],
+            checkpoint_root=paths["checkpoint_root"],
+            git_reader=_fake_git,
+        )
+
+
 def test_runs_each_seed_once_and_resumes_only_verified_outputs(tmp_path: Path) -> None:
     paths = _frozen_fixture(tmp_path)
     output = tmp_path / "confirmation"
@@ -202,16 +271,16 @@ def test_runs_each_seed_once_and_resumes_only_verified_outputs(tmp_path: Path) -
     )
     assert manifest["status"] == "completed"
     assert set(manifest["completed_seeds"]) == {
-        str(seed) for seed in driver.EXPECTED_CONFIRMATION_SEEDS
+        str(seed) for seed in LEGACY_CONFIRMATION_SEEDS
     }
-    assert len(manifest["attempts"]) == len(driver.EXPECTED_CONFIRMATION_SEEDS)
+    assert len(manifest["attempts"]) == len(LEGACY_CONFIRMATION_SEEDS)
     aggregate = output / "per_state"
     aggregate_summary = json.loads((aggregate / "summary.json").read_text())
     assert aggregate_summary["training_seeds"] == list(
-        driver.EXPECTED_CONFIRMATION_SEEDS
+        LEGACY_CONFIRMATION_SEEDS
     )
     assert [row["train_seed"] for row in aggregate_summary["seed_results"]] == list(
-        driver.EXPECTED_CONFIRMATION_SEEDS
+        LEGACY_CONFIRMATION_SEEDS
     )
     assert aggregate_summary["implementation_reference"] == {
         "local_jaxaht": str(paths["jaxaht"].resolve()),
@@ -219,7 +288,7 @@ def test_runs_each_seed_once_and_resumes_only_verified_outputs(tmp_path: Path) -
         "rotate_source_commit": "rotate-head",
         "working_tree_clean": True,
     }
-    for seed in driver.EXPECTED_CONFIRMATION_SEEDS:
+    for seed in LEGACY_CONFIRMATION_SEEDS:
         completion = output / "completed" / f"seed_{seed}"
         assert (completion / "checkpoint/trained_policies/weights").is_file()
         assert (completion / "seed_result.json").is_file()
@@ -268,7 +337,7 @@ def test_resume_refuses_tampered_completed_checkpoint(tmp_path: Path) -> None:
         git_reader=_fake_git,
         process_runner=_successful_runner,
     )
-    seed = driver.EXPECTED_CONFIRMATION_SEEDS[0]
+    seed = LEGACY_CONFIRMATION_SEEDS[0]
     _write(
         output / f"completed/seed_{seed}/checkpoint/trained_policies/weights",
         "tampered\n",
@@ -363,7 +432,7 @@ def test_failed_attempt_is_preserved_and_retry_uses_new_attempt(tmp_path: Path) 
             git_reader=_fake_git,
             process_runner=failed_runner,
         )
-    first_seed = driver.EXPECTED_CONFIRMATION_SEEDS[0]
+    first_seed = LEGACY_CONFIRMATION_SEEDS[0]
     first_attempt = output / f"attempts/seed_{first_seed}/attempt_1"
     assert json.loads((first_attempt / "attempt.json").read_text())["status"] == "failed"
     assert (first_attempt / "stdout.log").read_text() == "partial output\n"
@@ -383,4 +452,4 @@ def test_failed_attempt_is_preserved_and_retry_uses_new_attempt(tmp_path: Path) 
     )
     assert manifest["status"] == "completed"
     assert (output / f"attempts/seed_{first_seed}/attempt_2/attempt.json").is_file()
-    assert len(manifest["attempts"]) == len(driver.EXPECTED_CONFIRMATION_SEEDS) + 1
+    assert len(manifest["attempts"]) == len(LEGACY_CONFIRMATION_SEEDS) + 1

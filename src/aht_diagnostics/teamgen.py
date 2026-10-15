@@ -16,6 +16,8 @@ OFFICIAL_ROTATE_REPOSITORY = "https://github.com/LARG/jax-aht"
 
 # Current JaxAHT expts-branch Cramped Room settings. The runner reads the
 # selected checkout directly; this table is used for profile-sized runs.
+# With 64 environments this budget gives each teammate and best response only
+# 50 PPO updates, too few for competent Cramped Room teammates.
 OFFICIAL_CRAMPED_ROOM_CONFIG = {
     "TIMESTEPS_PER_ITER_PARTNER": 5_220_000,
     "NUM_ENVS": 64,
@@ -29,6 +31,40 @@ OFFICIAL_CRAMPED_ROOM_CONFIG = {
     "LAMBDA_2": 1.0,
     "ANNEAL_LR": True,
 }
+
+
+# Teammate-generation settings reported for Cramped Room in the ROTATE
+# manuscript (Table 14): 16 environments and 6M steps give 234 PPO updates.
+# NUM_MINIBATCHES is not reported there and follows the JaxAHT base config.
+ROTATE_PAPER_CRAMPED_ROOM_CONFIG = {
+    "TIMESTEPS_PER_ITER_PARTNER": 6_000_000,
+    "NUM_ENVS": 16,
+    "LR": 1e-4,
+    "UPDATE_EPOCHS": 20,
+    "NUM_MINIBATCHES": 4,
+    "CLIP_EPS": 0.2,
+    "ENT_COEF": 0.01,
+    "LAMBDA_1": 4.0,
+    "LAMBDA_2": 4.0,
+    "ANNEAL_LR": True,
+}
+
+TRAINING_PRESETS = {
+    "jaxaht-expts": {},
+    "rotate-paper": ROTATE_PAPER_CRAMPED_ROOM_CONFIG,
+}
+
+
+def partner_num_updates(config: dict[str, object]) -> int:
+    """PPO updates JaxAHT's ROTATE gives one teammate and its best response."""
+
+    per_update = (
+        int(config["ROLLOUT_LENGTH"])
+        * 4
+        * int(config["NUM_ENVS"])
+        * int(config.get("PARTNER_POP_SIZE", 1))
+    )
+    return int(config["TIMESTEPS_PER_ITER_PARTNER"]) // per_update
 
 
 def evidence_status(mode: str, *, training_timesteps_overridden: bool) -> str:

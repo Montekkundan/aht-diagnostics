@@ -239,6 +239,7 @@ def _take_step(
     before = state_view(snapshot.env_state)
     next_obs, next_state, reward, done, _ = env.step(step_rng, snapshot.env_state, actions)
     after = state_view(next_state)
+    terminal_autoreset = bool(np.asarray(done["__all__"]).squeeze())
     step_reward = _scalar(reward["agent_0"])
     cumulative_return = snapshot.cumulative_return + step_reward
     next_previous = {
@@ -257,13 +258,21 @@ def _take_step(
         partner_position=before.positions[1],
         ego_inventory=before.inventories[0],
         partner_inventory=before.inventories[1],
-        ego_event=semantic_event(before, after, 0, ego_action, step_reward),
+        ego_event=semantic_event(
+            before,
+            after,
+            0,
+            ego_action,
+            step_reward,
+            terminal_autoreset=terminal_autoreset,
+        ),
         partner_event=semantic_event(
             before,
             after,
             1,
             partner_action,
             _scalar(reward["agent_1"]),
+            terminal_autoreset=terminal_autoreset,
         ),
         ego_base_action=int(ego_metadata["base_action"]),
         ego_defect_type=str(ego_metadata["defect_type"]),

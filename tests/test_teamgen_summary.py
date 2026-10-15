@@ -3,9 +3,13 @@ import unittest
 from aht_diagnostics.rollout import Episode, StepRecord
 from aht_diagnostics.teamgen import (
     CANONICAL_ROTATE_OBJECTIVE,
+    OFFICIAL_CRAMPED_ROOM_CONFIG,
+    ROTATE_PAPER_CRAMPED_ROOM_CONFIG,
+    TRAINING_PRESETS,
     TRAJECTORY_REGRET_BASELINE,
     evidence_status,
     mean_and_bootstrap_ci,
+    partner_num_updates,
     semantic_event_counts,
     summarize_pairing,
     training_overrides,
@@ -44,6 +48,18 @@ class TeamGenerationSummaryTests(unittest.TestCase):
         overrides = training_overrides("profile", "per_trajectory_regret", 400)
         self.assertEqual(overrides["CONF_OBJ_TYPE"], TRAJECTORY_REGRET_BASELINE)
         self.assertEqual(overrides["TIMESTEPS_PER_ITER_PARTNER"], 102_400)
+
+    def test_update_count_matches_jaxaht_partner_schedule(self):
+        expts = {**OFFICIAL_CRAMPED_ROOM_CONFIG, "ROLLOUT_LENGTH": 400,
+                 "TIMESTEPS_PER_ITER_PARTNER": 5_120_000}
+        self.assertEqual(partner_num_updates(expts), 50)
+        paper = {**ROTATE_PAPER_CRAMPED_ROOM_CONFIG, "ROLLOUT_LENGTH": 400}
+        self.assertEqual(partner_num_updates(paper), 234)
+
+    def test_presets_keep_the_released_default_and_offer_the_paper_budget(self):
+        self.assertEqual(TRAINING_PRESETS["jaxaht-expts"], {})
+        self.assertEqual(TRAINING_PRESETS["rotate-paper"]["NUM_ENVS"], 16)
+        self.assertEqual(TRAINING_PRESETS["rotate-paper"]["LAMBDA_1"], 4.0)
 
     def test_prespecified_budget_is_not_labeled_timeboxed(self):
         self.assertEqual(

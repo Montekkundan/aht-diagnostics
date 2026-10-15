@@ -14,6 +14,60 @@ JAXAHT_HEAD = "2" * 40
 ROTATE_HEAD = "3" * 40
 
 
+def test_layout_resolution_preserves_legacy_checkpoint_and_requires_explicit_transfer(
+    tmp_path: Path,
+) -> None:
+    checkpoint_index = {"fixed_ego": {"checkpoint": "legacy/ego"}}
+    layout, checkpoint = exporter._resolve_environment_and_checkpoint(
+        specification={},
+        source_summary={},
+        checkpoint_index=checkpoint_index,
+        checkpoint_root=tmp_path,
+    )
+    assert layout == "cramped_room"
+    assert checkpoint == (tmp_path / "legacy/ego").resolve()
+
+    with pytest.raises(ValueError, match="source summary environment"):
+        exporter._resolve_environment_and_checkpoint(
+            specification={"environment": "overcooked-v1/counter_circuit"},
+            source_summary={},
+            checkpoint_index=checkpoint_index,
+            checkpoint_root=tmp_path,
+        )
+    with pytest.raises(ValueError, match="fixed_ego_checkpoint"):
+        exporter._resolve_environment_and_checkpoint(
+            specification={"environment": "overcooked-v1/counter_circuit"},
+            source_summary={"environment": "overcooked-v1/counter_circuit"},
+            checkpoint_index=checkpoint_index,
+            checkpoint_root=tmp_path,
+        )
+
+    layout, checkpoint = exporter._resolve_environment_and_checkpoint(
+        specification={
+            "environment": "overcooked-v1/counter_circuit",
+            "fixed_ego_checkpoint": "counter/ego",
+        },
+        source_summary={"environment": "overcooked-v1/counter_circuit"},
+        checkpoint_index=checkpoint_index,
+        checkpoint_root=tmp_path,
+    )
+    assert layout == "counter_circuit"
+    assert checkpoint == (tmp_path / "counter/ego").resolve()
+
+
+def test_layout_resolution_rejects_source_mismatch(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="does not match"):
+        exporter._resolve_environment_and_checkpoint(
+            specification={
+                "environment": "overcooked-v1/counter_circuit",
+                "fixed_ego_checkpoint": "counter/ego",
+            },
+            source_summary={"environment": "overcooked-v1/cramped_room"},
+            checkpoint_index={},
+            checkpoint_root=tmp_path,
+        )
+
+
 def _confirmation_specification() -> dict[str, object]:
     return {
         "status": "prospective_diagnostic_baseline_confirmation_rows",

@@ -93,6 +93,46 @@ def _is_confirmation_export(
     return "confirmation" in identifying_text
 
 
+def _resolve_environment_and_checkpoint(
+    *,
+    specification: dict[str, Any],
+    source_summary: dict[str, Any],
+    checkpoint_index: dict[str, Any],
+    checkpoint_root: Path,
+) -> tuple[str, Path]:
+    """Keep legacy Cramped Room exports intact and require explicit layout provenance elsewhere."""
+    environment = specification.get("environment", "overcooked-v1/cramped_room")
+    if not isinstance(environment, str) or not environment.startswith(
+        "overcooked-v1/"
+    ):
+        raise ValueError("environment must identify an overcooked-v1 layout")
+    layout = environment.removeprefix("overcooked-v1/")
+    allowed = "abcdefghijklmnopqrstuvwxyz0123456789_"
+    if not layout or any(character not in allowed for character in layout):
+        raise ValueError("environment contains an invalid layout name")
+
+    source_environment = source_summary.get("environment")
+    if source_environment is not None and source_environment != environment:
+        raise ValueError(
+            "source summary environment does not match export configuration: "
+            f"observed={source_environment!r}, expected={environment!r}"
+        )
+    if layout != "cramped_room" and source_environment is None:
+        raise ValueError("non-Cramped Room export requires source summary environment")
+
+    configured_checkpoint = specification.get("fixed_ego_checkpoint")
+    if configured_checkpoint is None:
+        if layout != "cramped_room":
+            raise ValueError("non-Cramped Room export requires fixed_ego_checkpoint")
+        checkpoint = checkpoint_root / checkpoint_index["fixed_ego"]["checkpoint"]
+    else:
+        if not isinstance(configured_checkpoint, str) or not configured_checkpoint:
+            raise ValueError("fixed_ego_checkpoint must be a non-empty path")
+        path = Path(configured_checkpoint)
+        checkpoint = path if path.is_absolute() else checkpoint_root / path
+    return layout, checkpoint.resolve()
+
+
 def _integer_seed_list(value: Any, *, field: str) -> list[int]:
     if not isinstance(value, list) or not value:
         raise ValueError(f"{field} must be a non-empty list for confirmation")
@@ -386,7 +426,12 @@ def main() -> int:
         source_summary=source_summary,
         jaxaht_path=jaxaht_path,
     )
-    fixed_checkpoint = checkpoint_root / checkpoint_index["fixed_ego"]["checkpoint"]
+    layout, fixed_checkpoint = _resolve_environment_and_checkpoint(
+        specification=specification,
+        source_summary=source_summary,
+        checkpoint_index=checkpoint_index,
+        checkpoint_root=checkpoint_root,
+    )
     frozen_protocol_validation = None
     if confirmation_inputs is not None:
         if not args.expected_protocol_sha256:
@@ -428,7 +473,7 @@ def main() -> int:
         / "configs"
         / "task"
         / "overcooked-v1"
-        / "cramped_room.yaml"
+        / f"{layout}.yaml"
     )
     base_kwargs = OmegaConf.to_container(task.ENV_KWARGS, resolve=True)
     env_kwargs = condition_kwargs(
@@ -513,6 +558,7 @@ def main() -> int:
         "claim_scope": specification["claim_scope"],
         "protocol": {
             "source_results": str(source_results_relative),
+            "environment": f"overcooked-v1/{layout}",
             "environment_condition": specification["environment_condition"],
             "max_steps": max_steps,
             "minimum_lock_steps": minimum_lock_steps,

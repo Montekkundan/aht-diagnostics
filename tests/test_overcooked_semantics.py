@@ -58,6 +58,23 @@ class OvercookedSemanticTests(unittest.TestCase):
         )
         self.assertEqual(event, "deliver_soup")
 
+    def test_terminal_autoreset_does_not_invent_inventory_events(self):
+        before = view(partner_inventory="empty")
+        reset = view(partner_inventory="onion")
+        for action in (4, 5):
+            with self.subTest(action=action):
+                self.assertEqual(
+                    semantic_event(
+                        before,
+                        reset,
+                        agent_index=1,
+                        action=action,
+                        reward=0.0,
+                        terminal_autoreset=True,
+                    ),
+                    "terminal_state_unobserved",
+                )
+
     def test_names_movement_and_blocking(self):
         moved = semantic_event(
             view(position=(1, 1)),
